@@ -1,58 +1,48 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Search, Filter, Bell } from "lucide-react";
+import Header from "../ui/header";
+import { reportService } from "../../services/report.service";
 
 export default function Reports() {
   interface Report {
-    id: number;
+    id: string;
     location: string;
     date: string;
     time: string;
     reportType: string;
     status: string;
+    imageUrl: string; // ✅ ADD THIS
   }
 
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // ✅ future API call yahi pe
+  // ✅ useState always here (top level)
+  const [selectedReport, setSelectedReport] = useState<Report | null>(null);
+
   const fetchReports = async () => {
     try {
       setLoading(true);
 
-      // TODO: yaha tum apna API URL laga dena
-      // const res = await fetch("YOUR_API_URL");
-      // const data = await res.json();
-      // setReports(data);
+      const data: any = await reportService.getReports();
 
-      // Dummy
-      setReports([
-        {
-          id: 1,
-          location: "Canaught Place",
-          date: "25/02/2025",
-          time: "09:45 AM",
-          reportType: "Water Log",
-          status: "09:45 AM",
-        },
-        {
-          id: 2,
-          location: "Akhand Vihar",
-          date: "25/02/2025",
-          time: "09:45 AM",
-          reportType: "Drain Block",
-          status: "09:45 AM",
-        },
-        {
-          id: 3,
-          location: "Janki Vihar",
-          date: "25/02/2025",
-          time: "09:45 AM",
-          reportType: "Water Log",
-          status: "09:45 AM",
-        },
-      ]);
+      const mappedReports: Report[] = data.features.map((feature: any) => {
+        const p = feature.properties;
+        const [lng, lat] = feature.geometry.coordinates;
+
+        return {
+          id: p.id,
+          location: `Lat: ${lat}, Lng: ${lng}`,
+          date: p.eventDate,
+          time: p.eventTime,
+          reportType: p.reportType,
+          status: p.status,
+          imageUrl: p.imageUrl, // ✅ ADD THIS
+        };
+      });
+
+      setReports(mappedReports);
     } catch (error) {
       console.error("fetchReports error:", error);
     } finally {
@@ -66,42 +56,8 @@ export default function Reports() {
 
   return (
     <div className="flex-1 flex flex-col bg-white rounded-l-[25px] shadow-lg overflow-hidden">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-8 py-6">
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-600">
-              Welcome Alfred !
-            </h2>
-            <p className="text-sm text-gray-500 mt-1">
-              Here is the overview of All Submitted reports
-            </p>
-          </div>
+      <Header />
 
-          <button className="relative p-2 hover:bg-gray-100 rounded-lg">
-            <Bell className="w-5 h-5 text-gray-600" />
-            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
-          </button>
-        </div>
-
-        {/* Search */}
-        <div className="flex gap-3">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-600" />
-            <input
-              type="text"
-              placeholder="Search for complaint id"
-              className="w-full pl-10 pr-4 py-2.5 placeholder:text-gray-400 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <button className="px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2">
-            <Filter className="w-5 h-5 text-gray-600" />
-          </button>
-        </div>
-      </div>
-
-      {/* Table */}
       <div className="flex-1 overflow-auto px-8 py-6">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200">
           {loading ? (
@@ -135,17 +91,20 @@ export default function Reports() {
               </thead>
 
               <tbody className="divide-y divide-gray-200">
-                {reports.map((report) => (
+                {reports.map((report, index) => (
                   <tr key={report.id} className="hover:bg-gray-50 transition">
                     <td className="px-6 py-4 text-sm text-gray-500">
-                      {report.id}.
+                      {index + 1}.
                     </td>
+
                     <td className="px-6 py-4 text-sm text-gray-700">
                       {report.location}
                     </td>
+
                     <td className="px-6 py-4 text-sm text-gray-500">
                       {report.date}
                     </td>
+
                     <td className="px-6 py-4 text-sm text-gray-500">
                       {report.time}
                     </td>
@@ -167,13 +126,34 @@ export default function Reports() {
                     </td>
 
                     <td className="px-6 py-4">
-                      <button className="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-600">
+                      <button
+                        onClick={() => {
+                          setSelectedReport(report);
+                          console.log("Selected Report:", report);
+                          console.log("Image URL:", report.imageUrl);
+
+                          if (report.imageUrl) {
+                            window.open(report.imageUrl, "_blank");
+                          } else {
+                            alert("Image not available");
+                          }
+                        }}
+                        className="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-600"
+                      >
                         <span>📋</span>
                         <span>View</span>
                       </button>
                     </td>
                   </tr>
                 ))}
+
+                {!loading && reports.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="text-center py-10 text-gray-400">
+                      No Reports Found
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           )}
@@ -182,3 +162,7 @@ export default function Reports() {
     </div>
   );
 }
+
+
+
+
