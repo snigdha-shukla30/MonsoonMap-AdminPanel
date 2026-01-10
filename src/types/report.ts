@@ -8,6 +8,7 @@ export type GeoJSONReportsResponse = {
     };
     properties: {
       id: string;
+      address: string; 
       severity: string;
       imageUrl: string;
       description: string;
