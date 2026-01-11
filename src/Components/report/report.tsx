@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import Header from "../ui/header";
+import {Header} from "../ui/header";
 import { reportService } from "../../services/report.service";
 
 export default function Reports() {

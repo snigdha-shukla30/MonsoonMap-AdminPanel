@@ -1,17 +1,56 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { FileText, CheckCircle, Clock } from "lucide-react";
-import Header from "../../Components/ui/header";
+import {Header} from "../../Components/ui/header";
+import { GoogleMap, LoadScript, MarkerF } from "@react-google-maps/api";
+import { dashboardService } from "../../services/dashboard.service";
+
+type MapType = "waterlog" | "drainblock";
+
+type ReportMarker = {
+  id: number;
+  title: string;
+  type: MapType;
+  lat: number;
+  lng: number;
+  count?: number;
+};
 
 export default function DashboardRight() {
-  const [mapType, setMapType] = useState<"waterlog" | "drainblock">("waterlog");
+  const [mapType, setMapType] = useState<MapType>("waterlog");
   const [searchQuery, setSearchQuery] = useState("");
 
+  // ✅ API stats state
+  const [statsData, setStatsData] = useState({
+    totalReports: 0,
+    completedReports: 0,
+    ongoingReports: 0,
+  });
+
+  const fetchDashboardStats = async () => {
+    try {
+      const res = await dashboardService.getStats();
+
+      setStatsData({
+        totalReports: res.totalReports,
+        completedReports: res.completedReports,
+        ongoingReports: res.ongoingReports,
+      });
+    } catch (error) {
+      console.error("fetchDashboardStats error:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchDashboardStats();
+  }, []);
+
+  // ✅ stats array (UI same, values API se)
   const stats = [
     {
       id: 1,
-      count: 25,
+      count: statsData.totalReports, // ✅ API mapped
       label: "Total Report",
       sublabel: "Received",
       icon: FileText,
@@ -20,7 +59,7 @@ export default function DashboardRight() {
     },
     {
       id: 2,
-      count: 15,
+      count: statsData.completedReports, // ✅ API mapped
       label: "Resolved Report",
       sublabel: "",
       icon: CheckCircle,
@@ -29,7 +68,7 @@ export default function DashboardRight() {
     },
     {
       id: 3,
-      count: 5,
+      count: statsData.ongoingReports, // ✅ API mapped
       label: "Pending Reports",
       sublabel: "",
       icon: Clock,
@@ -38,9 +77,53 @@ export default function DashboardRight() {
     },
   ];
 
+  // ✅ Dummy markers (same)
+  const allMarkers: ReportMarker[] = [
+    {
+      id: 1,
+      title: "Velle Punjabi G",
+      type: "drainblock",
+      lat: 28.6358,
+      lng: 77.2245,
+    },
+    {
+      id: 2,
+      title: "TMB Tata Motors",
+      type: "waterlog",
+      lat: 28.6204,
+      lng: 77.2142,
+      count: 30,
+    },
+    {
+      id: 3,
+      title: "Gaurav Optical",
+      type: "waterlog",
+      lat: 28.5882,
+      lng: 77.1726,
+    },
+    {
+      id: 4,
+      title: "Icon Hospital",
+      type: "drainblock",
+      lat: 28.5609,
+      lng: 77.2511,
+    },
+  ];
+
+  const filteredMarkers = useMemo(() => {
+    return allMarkers.filter((m) => m.type === mapType);
+  }, [mapType]);
+
+  const mapCenter = useMemo(() => ({ lat: 28.6139, lng: 77.209 }), []);
+
+  const markerIcon = useMemo(() => {
+    const blue = "http://maps.google.com/mapfiles/ms/icons/blue-dot.png";
+    const red = "http://maps.google.com/mapfiles/ms/icons/red-dot.png";
+    return mapType === "waterlog" ? blue : red;
+  }, [mapType]);
+
   return (
     <div className="flex-1 flex flex-col bg-white rounded-l-[25px] shadow-lg overflow-hidden">
-      {/* ✅ SAME HEADER AS REPORT PAGE */}
       <Header
         title="Welcome Alfred !"
         subtitle="Here is the overview of All Submitted reports ."
@@ -49,7 +132,6 @@ export default function DashboardRight() {
         onSearchChange={setSearchQuery}
       />
 
-      {/* ✅ Dashboard Body */}
       <div className="flex-1 overflow-auto bg-gray-50 p-8">
         <div className="max-w-7xl mx-auto">
           {/* Stats Cards */}
@@ -85,7 +167,7 @@ export default function DashboardRight() {
             })}
           </div>
 
-          {/* Map Analytics Section */}
+          {/* Map Analytics Section (unchanged) */}
           <div className="bg-white rounded-2xl shadow-sm p-6 border border-gray-100">
             <div className="flex items-center gap-2 mb-6">
               <svg
@@ -106,7 +188,6 @@ export default function DashboardRight() {
               </h2>
             </div>
 
-            {/* Map Type Toggles */}
             <div className="flex gap-4 mb-6">
               <button
                 onClick={() => setMapType("waterlog")}
@@ -141,26 +222,40 @@ export default function DashboardRight() {
               </button>
             </div>
 
-            {/* Map Container */}
             <div className="relative w-full h-96 bg-gray-100 rounded-xl overflow-hidden border border-gray-200">
-              <iframe
-                width="100%"
-                height="100%"
-                style={{ border: 0 }}
-                loading="lazy"
-                allowFullScreen
-                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d224346.54004882768!2d77.04417!3d28.527554!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x390cfd5b347eb62d%3A0x52c2b7494e204dce!2sNew%20Delhi%2C%20Delhi!5e0!3m2!1sen!2sin!4v1234567890"
-              ></iframe>
+              <LoadScript
+                googleMapsApiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY!}
+              >
+                <GoogleMap
+                  mapContainerStyle={{ width: "100%", height: "100%" }}
+                  center={mapCenter}
+                  zoom={11}
+                  options={{
+                    fullscreenControl: false,
+                    streetViewControl: false,
+                    mapTypeControl: false,
+                  }}
+                >
+                  {filteredMarkers.map((m) => (
+                    <MarkerF
+                      key={m.id}
+                      position={{ lat: m.lat, lng: m.lng }}
+                      title={m.title}
+                      icon={markerIcon}
+                    />
+                  ))}
+                </GoogleMap>
+              </LoadScript>
 
-              {/* Markers */}
-              <div className="absolute top-6 left-32 bg-orange-500 text-white px-3 py-1.5 rounded-full text-xs font-semibold shadow-lg flex items-center gap-1">
+              {/* existing overlay chips unchanged */}
+              <div className="absolute top-6 left-32 bg-orange-500 text-white px-3 py-1.5 rounded-full text-xs font-semibold shadow-lg flex items-center gap-1 pointer-events-none">
                 <div className="w-5 h-5 bg-white rounded-full flex items-center justify-center">
                   🍽️
                 </div>
                 Velle Punjabi G
               </div>
 
-              <div className="absolute top-6 right-32 bg-blue-500 text-white px-3 py-1.5 rounded-full text-xs font-semibold shadow-lg flex items-center gap-2">
+              <div className="absolute top-6 right-32 bg-blue-500 text-white px-3 py-1.5 rounded-full text-xs font-semibold shadow-lg flex items-center gap-2 pointer-events-none">
                 <div className="w-5 h-5 bg-white rounded-full flex items-center justify-center text-blue-600">
                   💧
                 </div>
@@ -170,14 +265,14 @@ export default function DashboardRight() {
                 </span>
               </div>
 
-              <div className="absolute bottom-24 left-32 bg-blue-500 text-white px-3 py-1.5 rounded-full text-xs font-semibold shadow-lg flex items-center gap-1">
+              <div className="absolute bottom-24 left-32 bg-blue-500 text-white px-3 py-1.5 rounded-full text-xs font-semibold shadow-lg flex items-center gap-1 pointer-events-none">
                 <div className="w-5 h-5 bg-white rounded-full flex items-center justify-center">
                   🏪
                 </div>
                 Gaurav Optical
               </div>
 
-              <div className="absolute bottom-16 right-24 bg-red-500 text-white px-3 py-1.5 rounded-full text-xs font-semibold shadow-lg flex items-center gap-1">
+              <div className="absolute bottom-16 right-24 bg-red-500 text-white px-3 py-1.5 rounded-full text-xs font-semibold shadow-lg flex items-center gap-1 pointer-events-none">
                 <div className="w-5 h-5 bg-white rounded-full flex items-center justify-center">
                   🏥
                 </div>
@@ -193,192 +288,3 @@ export default function DashboardRight() {
 
 
 
-
-
-
-
-
-// "use client";
-
-// import React, { useEffect, useState } from "react";
-// import { Search, Filter, Bell } from "lucide-react";
-
-// export default function Dashboard() {
-//   interface Report {
-//     id: number;
-//     location: string;
-//     date: string;
-//     time: string;
-//     reportType: string;
-//     status: string;
-//   }
-
-//   const [reports, setReports] = useState<Report[]>([]);
-//   const [loading, setLoading] = useState(false);
-
-//   // ✅ future API call yahi pe
-// //   const fetchReports = async () => {
-// //     try {
-// //       setLoading(true);
-
-// //       // TODO: yaha tum apna API URL laga dena
-// //       // const res = await fetch("YOUR_API_URL");
-// //       // const data = await res.json();
-// //       // setReports(data);
-
-// //       // Dummy
-// //       setReports([
-// //         {
-// //           id: 1,
-// //           location: "Canaught Place",
-// //           date: "25/02/2025",
-// //           time: "09:45 AM",
-// //           reportType: "Water Log",
-// //           status: "09:45 AM",
-// //         },
-// //         {
-// //           id: 2,
-// //           location: "Akhand Vihar",
-// //           date: "25/02/2025",
-// //           time: "09:45 AM",
-// //           reportType: "Drain Block",
-// //           status: "09:45 AM",
-// //         },
-// //         {
-// //           id: 3,
-// //           location: "Janki Vihar",
-// //           date: "25/02/2025",
-// //           time: "09:45 AM",
-// //           reportType: "Water Log",
-// //           status: "09:45 AM",
-// //         },
-// //       ]);
-// //     } catch (error) {
-// //       console.error("fetchReports error:", error);
-// //     } finally {
-// //       setLoading(false);
-// //     }
-// //   };
-
-// //   useEffect(() => {
-// //     fetchReports();
-// //   }, []);
-
-//   return (
-//     <div className="flex-1 flex flex-col bg-white rounded-l-[25px] shadow-lg overflow-hidden">
-//       {/* Header */}
-//       <div className="bg-white border-b border-gray-200 px-8 py-6">
-//         <div className="flex items-start justify-between mb-4">
-//           <div>
-//             <h2 className="text-2xl font-bold text-gray-600">
-//               Welcome Alfred !
-//             </h2>
-//             <p className="text-sm text-gray-500 mt-1">
-//               Here is the overview of All Submitted reports
-//             </p>
-//           </div>
-
-//           <button className="relative p-2 hover:bg-gray-100 rounded-lg">
-//             <Bell className="w-5 h-5 text-gray-600" />
-//             <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
-//           </button>
-//         </div>
-
-//         {/* Search */}
-//         <div className="flex gap-3">
-//           <div className="flex-1 relative">
-//             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-600" />
-//             <input
-//               type="text"
-//               placeholder="Search for complaint id"
-//               className="w-full pl-10 pr-4 py-2.5 placeholder:text-gray-400 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-//             />
-//           </div>
-
-//           <button className="px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2">
-//             <Filter className="w-5 h-5 text-gray-600" />
-//           </button>
-//         </div>
-//       </div>
-
-//       {/* Table */}
-//       {/* <div className="flex-1 overflow-auto px-8 py-6">
-//         <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-//           {loading ? (
-//             <div className="p-6 text-gray-500 text-sm">Loading reports...</div>
-//           ) : (
-//             <table className="w-full">
-//               <thead>
-//                 <tr className="border-b border-gray-200">
-//                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-//                     Sr no
-//                   </th>
-//                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-//                     Location
-//                   </th>
-//                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-//                     Date
-//                   </th>
-//                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-//                     Time
-//                   </th>
-//                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-//                     Report Type
-//                   </th>
-//                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-//                     Status
-//                   </th>
-//                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-//                     Details
-//                   </th>
-//                 </tr>
-//               </thead>
-
-//               <tbody className="divide-y divide-gray-200">
-//                 {reports.map((report) => (
-//                   <tr key={report.id} className="hover:bg-gray-50 transition">
-//                     <td className="px-6 py-4 text-sm text-gray-500">
-//                       {report.id}.
-//                     </td>
-//                     <td className="px-6 py-4 text-sm text-gray-700">
-//                       {report.location}
-//                     </td>
-//                     <td className="px-6 py-4 text-sm text-gray-500">
-//                       {report.date}
-//                     </td>
-//                     <td className="px-6 py-4 text-sm text-gray-500">
-//                       {report.time}
-//                     </td>
-
-//                     <td className="px-6 py-4">
-//                       <span
-//                         className={`text-sm font-medium ${
-//                           report.reportType === "Water Log"
-//                             ? "text-blue-600"
-//                             : "text-red-600"
-//                         }`}
-//                       >
-//                         {report.reportType}
-//                       </span>
-//                     </td>
-
-//                     <td className="px-6 py-4 text-sm text-gray-500">
-//                       {report.status}
-//                     </td>
-
-//                     <td className="px-6 py-4">
-//                       <button className="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-600">
-//                         <span>📋</span>
-//                         <span>View</span>
-//                       </button>
-//                     </td>
-//                   </tr>
-//                 ))}
-//               </tbody>
-//             </table>
-//           )}
-//         </div> */}
-//       {/* </div> */}
-//     </div>
-//   );
-// }
